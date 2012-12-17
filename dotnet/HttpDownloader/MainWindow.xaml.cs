@@ -86,7 +86,7 @@ namespace HttpDownloader
             }
         }
 
-        private void RecursiveUrls(List<string> inputUrls, string rootDirectory, TaskScheduler uiSyncContext)
+        private void RecursiveUrls(List<string> inputUrls, string rootDirectory)
         {
             URLs = inputUrls;
             int i = 0;            
@@ -149,8 +149,8 @@ namespace HttpDownloader
                     this.Cursor = this.SavedCursor;
                     this.StartDownloadButton.Content = "开始下载";
                     this.StartDownloadButton.IsEnabled = true;
-                    this.UrlsTextBox.IsEnabled = true;
-                    this.LocalDirectoryTextBox.IsEnabled = true;
+                    this.UrlsTextBox.IsReadOnly = false;
+                    this.LocalDirectoryTextBox.IsReadOnly = false;
                     this.LocalDirectoryBrowsButton.IsEnabled = true;
                 }));
                 lock (DownloadActionLock)
@@ -169,11 +169,10 @@ namespace HttpDownloader
             this.DownloadProgressBar.Value = 0;
             this.StartDownloadButton.Content = "下载中……";
             this.StartDownloadButton.IsEnabled = false;
-            this.UrlsTextBox.IsEnabled = false;
-            this.LocalDirectoryTextBox.IsEnabled = false;
+            this.UrlsTextBox.IsReadOnly = true;
+            this.LocalDirectoryTextBox.IsReadOnly = true;
             this.LocalDirectoryBrowsButton.IsEnabled = false;
-            var uiSyncContext = System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext();
-            Task.Factory.StartNew(() => this.RecursiveUrls(urls, rootDirectory, uiSyncContext));
+            Task.Factory.StartNew(() => this.RecursiveUrls(urls, rootDirectory));
         }
 
         private void SaveUri(Uri uri, string rootDirectory)
@@ -316,7 +315,7 @@ namespace HttpDownloader
                                     {
                                         this.StatusLabel.Content = "New URL: " + newUrl;
                                     }));
-                                    Thread.Sleep(500);
+                                    //Thread.Sleep(500);
                                 }
                             }
                             nodes.Enqueue(child);
