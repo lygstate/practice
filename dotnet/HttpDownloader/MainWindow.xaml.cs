@@ -78,19 +78,11 @@ namespace HttpDownloader
         const int taskCount = 4;
         static List<string> URLs;
 
-        private void addUri(Uri uri)
+        private void addUri(string url)
         {
             lock (URLsLock)
             {
-                var url = uri.ToString();
-                if (url.StartsWith(rootURL))
-                {
-                    URLs.Add(url);
-                }
-                else
-                {
-                    Console.WriteLine(url);
-                }
+                URLs.Add(url);
             }
         }
 
@@ -244,7 +236,8 @@ namespace HttpDownloader
                 if (IO.File.Exists(fullPath))
                 {
                     var info = new IO.FileInfo(fullPath);
-                    if (info.Length == response.ContentLength)
+                    if (info.Length == response.ContentLength
+                        && info.LastWriteTimeUtc == response.LastModified)
                     {
                         needDown = false;
                     }
@@ -292,7 +285,11 @@ namespace HttpDownloader
                 webClient.DownloadFile(uri, fullPath);
                 webClient.Dispose();
                     * */
-
+                bool isHtml = uri.ToString().EndsWith("/");
+                if (isHtml != (response.ContentType.IndexOf("text/html") != -1))
+                {
+                    throw new Exception("Invalid ContentType of:" + response);
+                }
                 if (response.ContentType.IndexOf("text/html") != -1)
                 {
                     var x = new html.HtmlDocument();
@@ -311,15 +308,29 @@ namespace HttpDownloader
                             {
                                 if (attrib[0] != '/'
                                     && attrib.IndexOf('?') == -1
-                                    && attrib.IndexOf('?') == -1)
+                                    && attrib.IndexOf(':') == -1)
                                 {
                                     //System.Console.WriteLine(attrib);
-                                    this.addUri(new Uri(uri, attrib));
+                                    var newUrl = new Uri(uri, attrib).ToString();
+                                    this.addUri(newUrl);
+                                    Dispatcher.Invoke(new Action(() =>
+                                    {
+                                        this.StatusLabel.Content = "New URL: " + newUrl;
+                                    }));
+                                    Thread.Sleep(500);
                                 }
                             }
                             nodes.Enqueue(child);
                         }
                     }
+                }
+                else
+                {
+                    Dispatcher.Invoke(new Action(() =>
+                    {
+                        this.StatusLabel.Content = "Downloaded: " + uri;
+                    }));
+                    Thread.Sleep(1000);
                 }
                 request.Abort();
             }
