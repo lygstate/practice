@@ -36,7 +36,7 @@ namespace HttpDownloader
             this.LocalDirectoryBrowsButton.Click += LocalDirectoryBrowsButtonOnClick;
             this.StartDownloadButton.Click += StartDownloadButtonOnClick;
             this.LocalDirectoryTextBox.Text = Settings.Default.DownloadDirectory;
-            rootURL = "http://nchc.dl.sourceforge.net/project/mingw/";
+            rootURL = "http://jaist.dl.sourceforge.net/project/mingw/";
             this.rootURI = new Uri(rootURL);
             this.UrlsTextBox.Text = rootURL;
             this.DownloadProgressBar.Value = 0;
@@ -213,6 +213,16 @@ namespace HttpDownloader
                 
                 // 获取对应HTTP请求的响应
                 HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+                DateTime fileDate = DateTime.UtcNow;
+                try
+                {
+                    fileDate = DateTime.Parse(response.Headers.Get("Date")).ToUniversalTime();
+                }
+                catch(Exception)
+                {
+                    fileDate = DateTime.UtcNow;
+                }
+
                 string filePath = String.Empty;
                 try
                 {
@@ -244,8 +254,9 @@ namespace HttpDownloader
                 if (IO.File.Exists(fullPath))
                 {
                     var info = new IO.FileInfo(fullPath);
+                    info.Refresh();
                     if (info.Length == response.ContentLength
-                        && info.LastWriteTimeUtc == response.LastModified)
+                        && IO.File.GetLastWriteTimeUtc(fullPath) == fileDate)
                     {
                         needDown = false;
                     }
@@ -284,8 +295,15 @@ namespace HttpDownloader
                 }
                 if (IO.File.Exists(fullPath))
                 {
-                    var info = new IO.FileInfo(fullPath);
-                    info.LastWriteTimeUtc = response.LastModified;
+                    var dt = IO.File.GetLastWriteTimeUtc(fullPath);
+                    if (dt != fileDate)
+                    {
+                        IO.File.SetLastWriteTimeUtc(fullPath, fileDate);
+                    }
+                    else
+                    {
+                        Console.WriteLine(dt);
+                    }
                 }
                 /*
                 var webClient = new WebClient();
