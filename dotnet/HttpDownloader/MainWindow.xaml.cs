@@ -22,11 +22,13 @@ namespace HttpDownloader
     /// </summary>
     public partial class MainWindow
     {
-        List<string> urls;
-        private Mutex thisLock = new Mutex();
-        private Mutex downloadLock = new Mutex();
-        string rootURL;
-        Uri rootUri;
+        static string rootURL;
+        Uri rootURI;
+
+        private static Object DownloadActionLock = new Object();
+        private static Object URLsLock = new Object();
+        private static volatile bool IsDownloading = false;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -34,10 +36,9 @@ namespace HttpDownloader
             this.LocalDirectoryBrowsButton.Click += LocalDirectoryBrowsButtonOnClick;
             this.StartDownloadButton.Click += StartDownloadButtonOnClick;
             this.LocalDirectoryTextBox.Text = Settings.Default.DownloadDirectory;
-            this.rootURL = "http://nchc.dl.sourceforge.net/project/mingw/";
-            this.rootUri = new Uri(this.rootURL);
+            rootURL = "http://nchc.dl.sourceforge.net/project/mingw/";
+            this.rootURI = new Uri(rootURL);
             this.UrlsTextBox.Text = rootURL;
-
             this.DownloadProgressBar.Value = 0;
         }
 
@@ -62,44 +63,64 @@ namespace HttpDownloader
             }
             var urls = this.UrlsTextBox.Text.Split(new[] {
 				Environment.NewLine
-			}, StringSplitOptions.RemoveEmptyEntries);
-            if (thisLock.WaitOne(0) == false)
+			}, StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            lock (DownloadActionLock)
             {
-                return;
+                if (IsDownloading)
+                {
+                    return;
+                }
+                IsDownloading = true;
             }
-            this.SaveUrlsToLocal(urls.Distinct(StringComparer.OrdinalIgnoreCase).ToList(), this.LocalDirectoryTextBox.Text);
-            thisLock.ReleaseMutex();
+            this.SaveUrlsToLocal(urls, this.LocalDirectoryTextBox.Text);
         }
 
-        private void SaveUrlsToLocal(List<string> inputUrls, string rootDirectory)
-        {
-            var cursor = this.Cursor;
-            // disable the ui
-            this.urls = inputUrls;
-            this.Cursor = Cursors.Wait;
-            this.DownloadProgressBar.Maximum = urls.Count;
-            this.DownloadProgressBar.Value = 0;
-            this.StartDownloadButton.Content = "下载中……";
-            this.StartDownloadButton.IsEnabled = false;
-            this.UrlsTextBox.IsEnabled = false;
-            this.LocalDirectoryTextBox.IsEnabled = false;
-            this.LocalDirectoryBrowsButton.IsEnabled = false;
+        const int taskCount = 4;
+        static List<string> URLs;
 
-            const int taskCount = 4;
-            var uiSyncContext = System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext();
-            int i = 0;
-            while (i < urls.Count)
+        private void addUri(Uri uri)
+        {
+            lock (URLsLock)
             {
-                this.DownloadProgressBar.Maximum = urls.Count;
-                ArrayList tasks = new ArrayList();
-                int j = i;
-                for (; j < urls.Count && j < i + taskCount; ++j)
+                var url = uri.ToString();
+                if (url.StartsWith(rootURL))
                 {
-                    this.DownloadProgressBar.Value = j;
+                    URLs.Add(url);
+                }
+                else
+                {
+                    Console.WriteLine(url);
+                }
+            }
+        }
+
+        private void RecursiveUrls(List<string> inputUrls, string rootDirectory, TaskScheduler uiSyncContext)
+        {
+            URLs = inputUrls;
+            int i = 0;            
+            try
+            {
+                while (true)
+                {
+                    string url = null;
+                    int count = 0;
+                    lock (URLsLock)
+                    {
+                        if (i < URLs.Count)
+                        {
+                            url = URLs[i];
+                        }
+                        count = URLs.Count;
+                    }
+
+                    if (url == null)
+                    {
+                        break;
+                    }
                     Uri uri = null;
                     try
                     {
-                        uri = new Uri(urls[j]);
+                        uri = new Uri(url);
                     }
                     catch (Exception)
                     {
@@ -108,20 +129,67 @@ namespace HttpDownloader
                     if (uri != null)
                     {
                         this.SaveUri(uri, rootDirectory);
-                        //tasks.Add(Task.Factory.StartNew(() => this.SaveUri(uri, rootDirectory)).ContinueWith(t => this.DownloadProgressBar.Value += 1, uiSyncContext));
                     }
+
+                    ++i;
+                    Dispatcher.Invoke(new Action(() =>
+                    {
+                        int currentCount = count;
+                        if (currentCount >= this.DownloadProgressBar.Maximum)
+                        {
+                            this.DownloadProgressBar.Maximum = currentCount;
+                            this.DownloadProgressBar.Value = i;
+                        }
+                        else
+                        {
+                            this.DownloadProgressBar.Value = (i * this.DownloadProgressBar.Maximum / count);
+                        }
+                    }));
                 }
-                i = j;
             }
-            i = 0;
+            catch (Exception)
+            {
+            }
+            finally
+            {
+                Dispatcher.Invoke(new Action(() =>
+                {
+                    this.Cursor = this.SavedCursor;
+                    this.StartDownloadButton.Content = "开始下载";
+                    this.StartDownloadButton.IsEnabled = true;
+                    this.UrlsTextBox.IsEnabled = true;
+                    this.LocalDirectoryTextBox.IsEnabled = true;
+                    this.LocalDirectoryBrowsButton.IsEnabled = true;
+                }));
+                lock (DownloadActionLock)
+                {
+                    IsDownloading = false;
+                }
+            }
         }
-        private void addUri(Uri uri)
+        private Cursor SavedCursor;
+        private void SaveUrlsToLocal(List<string> urls, string rootDirectory)
         {
-            this.urls.Add(uri.ToString());
+            // disable the ui
+            this.SavedCursor = this.Cursor;
+            //this.Cursor = Cursors.Wait;
+            this.DownloadProgressBar.Maximum = urls.Count * 100;
+            this.DownloadProgressBar.Value = 0;
+            this.StartDownloadButton.Content = "下载中……";
+            this.StartDownloadButton.IsEnabled = false;
+            this.UrlsTextBox.IsEnabled = false;
+            this.LocalDirectoryTextBox.IsEnabled = false;
+            this.LocalDirectoryBrowsButton.IsEnabled = false;
+            var uiSyncContext = System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext();
+            Task.Factory.StartNew(() => this.RecursiveUrls(urls, rootDirectory, uiSyncContext));
         }
+
         private void SaveUri(Uri uri, string rootDirectory)
         {
-            StringBuilder content = new StringBuilder();
+            Dispatcher.Invoke(new Action(() =>
+            {
+                this.StatusLabel.Content = "Downloading: " + uri;
+            }));
             try
             {
                 // 与指定URL创建HTTP请求
@@ -142,10 +210,18 @@ namespace HttpDownloader
 
                 //不保持连接
                 request.KeepAlive = true;
-
+                
                 // 获取对应HTTP请求的响应
                 HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-                var filePath = this.rootUri.MakeRelativeUri(uri).ToString();
+                string filePath = String.Empty;
+                try
+                {
+                    filePath = this.rootURI.MakeRelativeUri(uri).ToString();
+                }
+                catch (Exception)
+                {
+                    filePath = String.Empty;
+                }
 
                 if (filePath == String.Empty || filePath.EndsWith("/"))
                 {
@@ -182,12 +258,12 @@ namespace HttpDownloader
 
                     var f = new IO.FileStream(fullPath, IO.FileMode.OpenOrCreate, IO.FileAccess.Write, IO.FileShare.None);
                     // 开始读取数据
-                    byte[] sReaderBuffer = new byte[256];
+                    byte[] sReaderBuffer = new byte[4096];
                     Console.WriteLine(response.ContentLength);
                     int pos = 0;
                     while (true)
                     {
-                        int count = sReader.Read(sReaderBuffer, 0, 256);
+                        int count = sReader.Read(sReaderBuffer, 0, 4096);
                         if (count <= 0)
                         {
                             break;
@@ -221,7 +297,9 @@ namespace HttpDownloader
                             string attrib = child.GetAttributeValue("href", String.Empty);
                             if (attrib != String.Empty)
                             {
-                                if (attrib[0] != '/' && attrib[0] != '?')
+                                if (attrib[0] != '/'
+                                    && attrib.IndexOf('?') == -1
+                                    && attrib.IndexOf('?') == -1)
                                 {
                                     //System.Console.WriteLine(attrib);
                                     this.addUri(new Uri(uri, attrib));
@@ -233,9 +311,9 @@ namespace HttpDownloader
                 }
                 request.Abort();
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                content = new StringBuilder("Runtime Error");
+                Console.WriteLine(e.ToString());
             }
         }
 
