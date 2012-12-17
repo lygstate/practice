@@ -154,6 +154,7 @@ namespace HttpDownloader
                     this.UrlsTextBox.IsReadOnly = false;
                     this.LocalDirectoryTextBox.IsReadOnly = false;
                     this.LocalDirectoryBrowsButton.IsEnabled = true;
+                    this.UrlsTextBox.Text = String.Join("\r\n", URLs);
                 }));
                 lock (DownloadActionLock)
                 {
