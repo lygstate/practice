@@ -243,7 +243,6 @@ namespace HttpDownloader
                     }
                 }
 
-                //this.StatusLabel.ContentStringFormat = "Fetching " + response.ContentType;
                 if (needDown)
                 {
                     // 获取响应流
@@ -304,11 +303,11 @@ namespace HttpDownloader
                         foreach (html.HtmlNode child in node.ChildNodes)
                         {
                             string attrib = child.GetAttributeValue("href", String.Empty);
+                            string testAttr = Uri.UnescapeDataString(attrib);
                             if (attrib != String.Empty)
                             {
-                                if (attrib[0] != '/'
-                                    && attrib.IndexOf('?') == -1
-                                    && attrib.IndexOf(':') == -1)
+                                if (testAttr[0] != '/'
+                                    && testAttr.IndexOfAny("*:<>?|".ToCharArray()) == -1)
                                 {
                                     //System.Console.WriteLine(attrib);
                                     var newUrl = new Uri(uri, attrib).ToString();
