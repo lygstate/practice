@@ -216,7 +216,7 @@ namespace HttpDownloader
                 DateTime fileDate = DateTime.UtcNow;
                 try
                 {
-                    fileDate = DateTime.Parse(response.Headers.Get("Date")).ToUniversalTime();
+                    fileDate = DateTime.Parse(response.Headers.Get("Last-Modified")).ToUniversalTime();
                 }
                 catch(Exception)
                 {
@@ -251,6 +251,7 @@ namespace HttpDownloader
                 }
 
                 bool needDown = true;
+                var otherDate = fileDate.ToUniversalTime();
                 if (IO.File.Exists(fullPath))
                 {
                     var info = new IO.FileInfo(fullPath);
@@ -295,15 +296,9 @@ namespace HttpDownloader
                 }
                 if (IO.File.Exists(fullPath))
                 {
-                    var dt = IO.File.GetLastWriteTimeUtc(fullPath);
-                    if (dt != fileDate)
-                    {
-                        IO.File.SetLastWriteTimeUtc(fullPath, fileDate);
-                    }
-                    else
-                    {
-                        Console.WriteLine(dt);
-                    }
+                    IO.File.SetLastWriteTimeUtc(fullPath, fileDate);
+                    IO.File.SetCreationTimeUtc(fullPath, fileDate);
+                    IO.File.SetLastAccessTimeUtc(fullPath, fileDate);
                 }
                 /*
                 var webClient = new WebClient();
