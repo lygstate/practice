@@ -216,7 +216,11 @@ namespace HttpDownloader
                 DateTime fileDate = DateTime.UtcNow;
                 try
                 {
-                    fileDate = DateTime.Parse(response.Headers.Get("Last-Modified")).ToUniversalTime();
+                    var dateStr = response.Headers.Get("Last-Modified");
+                    if (dateStr != null)
+                    {
+                        fileDate = DateTime.Parse(dateStr).ToUniversalTime();
+                    }
                 }
                 catch(Exception)
                 {
