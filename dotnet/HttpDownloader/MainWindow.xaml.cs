@@ -13,74 +13,80 @@ using System.Collections.Generic;
 using System.Threading;
 
 
-namespace HttpDownloader {
-using Properties;
+namespace HttpDownloader
+{
+    using Properties;
 
-	/// <summary>
-	/// Interaction logic for MainWindow.xaml
-	/// </summary>
-	public partial class MainWindow {
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow
+    {
         List<string> urls;
         private Mutex thisLock = new Mutex();
         private Mutex downloadLock = new Mutex();
         string rootURL;
         Uri rootUri;
-		public MainWindow() {
-			InitializeComponent();
+        public MainWindow()
+        {
+            InitializeComponent();
 
-			this.LocalDirectoryBrowsButton.Click += LocalDirectoryBrowsButtonOnClick;
-			this.StartDownloadButton.Click += StartDownloadButtonOnClick;
+            this.LocalDirectoryBrowsButton.Click += LocalDirectoryBrowsButtonOnClick;
+            this.StartDownloadButton.Click += StartDownloadButtonOnClick;
             this.LocalDirectoryTextBox.Text = Settings.Default.DownloadDirectory;
             this.rootURL = "http://nchc.dl.sourceforge.net/project/mingw/";
             this.rootUri = new Uri(this.rootURL);
             this.UrlsTextBox.Text = rootURL;
 
-			this.DownloadProgressBar.Value = 0;
-		}
+            this.DownloadProgressBar.Value = 0;
+        }
 
-		private void StartDownloadButtonOnClick(object sender, RoutedEventArgs routedEventArgs) {
-			if (string.IsNullOrWhiteSpace(this.UrlsTextBox.Text)) {
-				MessageBox.Show("请输入要下载的URL！", "错误：", MessageBoxButton.OK, MessageBoxImage.Error);
-				this.UrlsTextBox.Focus();
-				return;
-			}
-			if (string.IsNullOrWhiteSpace(this.LocalDirectoryTextBox.Text)) {
-				MessageBox.Show("请选择保存目录！", "错误：", MessageBoxButton.OK, MessageBoxImage.Error);
-				this.LocalDirectoryTextBox.Focus();
-				return;
-			}
+        private void StartDownloadButtonOnClick(object sender, RoutedEventArgs routedEventArgs)
+        {
+            if (string.IsNullOrWhiteSpace(this.UrlsTextBox.Text))
+            {
+                MessageBox.Show("请输入要下载的URL！", "错误：", MessageBoxButton.OK, MessageBoxImage.Error);
+                this.UrlsTextBox.Focus();
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(this.LocalDirectoryTextBox.Text))
+            {
+                MessageBox.Show("请选择保存目录！", "错误：", MessageBoxButton.OK, MessageBoxImage.Error);
+                this.LocalDirectoryTextBox.Focus();
+                return;
+            }
             if (Settings.Default.DownloadDirectory != this.LocalDirectoryTextBox.Text)
             {
                 Settings.Default.DownloadDirectory = this.LocalDirectoryTextBox.Text;
                 Settings.Default.Save();
             }
-			var urls = this.UrlsTextBox.Text.Split(new[] {
+            var urls = this.UrlsTextBox.Text.Split(new[] {
 				Environment.NewLine
 			}, StringSplitOptions.RemoveEmptyEntries);
             if (thisLock.WaitOne(0) == false)
             {
                 return;
             }
-			this.SaveUrlsToLocal(urls.Distinct(StringComparer.OrdinalIgnoreCase).ToList(), this.LocalDirectoryTextBox.Text);
+            this.SaveUrlsToLocal(urls.Distinct(StringComparer.OrdinalIgnoreCase).ToList(), this.LocalDirectoryTextBox.Text);
             thisLock.ReleaseMutex();
-		}
+        }
 
         private void SaveUrlsToLocal(List<string> inputUrls, string rootDirectory)
         {
-			var cursor = this.Cursor;
-			// disable the ui
+            var cursor = this.Cursor;
+            // disable the ui
             this.urls = inputUrls;
-			this.Cursor = Cursors.Wait;
-			this.DownloadProgressBar.Maximum = urls.Count;
-			this.DownloadProgressBar.Value = 0;
-			this.StartDownloadButton.Content = "下载中……";
-			this.StartDownloadButton.IsEnabled = false;
-			this.UrlsTextBox.IsEnabled = false;
-			this.LocalDirectoryTextBox.IsEnabled = false;
-			this.LocalDirectoryBrowsButton.IsEnabled = false;
+            this.Cursor = Cursors.Wait;
+            this.DownloadProgressBar.Maximum = urls.Count;
+            this.DownloadProgressBar.Value = 0;
+            this.StartDownloadButton.Content = "下载中……";
+            this.StartDownloadButton.IsEnabled = false;
+            this.UrlsTextBox.IsEnabled = false;
+            this.LocalDirectoryTextBox.IsEnabled = false;
+            this.LocalDirectoryBrowsButton.IsEnabled = false;
 
             const int taskCount = 4;
-			var uiSyncContext = System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext();
+            var uiSyncContext = System.Threading.Tasks.TaskScheduler.FromCurrentSynchronizationContext();
             int i = 0;
             while (i < urls.Count)
             {
@@ -108,12 +114,13 @@ using Properties;
                 i = j;
             }
             i = 0;
-		}
+        }
         private void addUri(Uri uri)
         {
             this.urls.Add(uri.ToString());
         }
-		private void SaveUri(Uri uri, string rootDirectory) {
+        private void SaveUri(Uri uri, string rootDirectory)
+        {
             StringBuilder content = new StringBuilder();
             try
             {
@@ -166,7 +173,7 @@ using Properties;
                         needDown = false;
                     }
                 }
-                    
+
                 //this.StatusLabel.ContentStringFormat = "Fetching " + response.ContentType;
                 if (needDown)
                 {
@@ -230,31 +237,37 @@ using Properties;
             {
                 content = new StringBuilder("Runtime Error");
             }
-		}
+        }
 
-		private static string GetFilePath(Uri uri) {
-			var host = uri.DnsSafeHost;
-			var filePath = host + uri.AbsolutePath;
-			filePath = filePath.Replace(IO.Path.AltDirectorySeparatorChar, IO.Path.DirectorySeparatorChar);
-			if (filePath.LastIndexOf(IO.Path.DirectorySeparatorChar) == filePath.Length - 1) {
-				filePath = filePath + "default.htm";
-			}
-			return filePath;
-		}
+        private static string GetFilePath(Uri uri)
+        {
+            var host = uri.DnsSafeHost;
+            var filePath = host + uri.AbsolutePath;
+            filePath = filePath.Replace(IO.Path.AltDirectorySeparatorChar, IO.Path.DirectorySeparatorChar);
+            if (filePath.LastIndexOf(IO.Path.DirectorySeparatorChar) == filePath.Length - 1)
+            {
+                filePath = filePath + "default.htm";
+            }
+            return filePath;
+        }
 
-		private void LocalDirectoryBrowsButtonOnClick(object sender, RoutedEventArgs routedEventArgs) {
-			var dialog = new WinForms.FolderBrowserDialog {
-				Description = @"选择一个目录进行保存：",
-				ShowNewFolderButton = true
-			};
-			if (!string.IsNullOrWhiteSpace(this.LocalDirectoryTextBox.Text)) {
-				dialog.SelectedPath = this.LocalDirectoryTextBox.Text;
-			}
-			var dialogResult = dialog.ShowDialog();
-			if (dialogResult == WinForms.DialogResult.OK) {
-				this.LocalDirectoryTextBox.Text = dialog.SelectedPath;
-			}
+        private void LocalDirectoryBrowsButtonOnClick(object sender, RoutedEventArgs routedEventArgs)
+        {
+            var dialog = new WinForms.FolderBrowserDialog
+            {
+                Description = @"选择一个目录进行保存：",
+                ShowNewFolderButton = true
+            };
+            if (!string.IsNullOrWhiteSpace(this.LocalDirectoryTextBox.Text))
+            {
+                dialog.SelectedPath = this.LocalDirectoryTextBox.Text;
+            }
+            var dialogResult = dialog.ShowDialog();
+            if (dialogResult == WinForms.DialogResult.OK)
+            {
+                this.LocalDirectoryTextBox.Text = dialog.SelectedPath;
+            }
 
-		}
-	}
+        }
+    }
 }
