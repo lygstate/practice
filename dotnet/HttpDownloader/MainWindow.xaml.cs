@@ -170,6 +170,7 @@ namespace HttpDownloader
             }
 
             rootURL = urls[0];
+            rootURI = new Uri(rootURL);
 
             // disable the ui
             this.SavedCursor = this.Cursor;
