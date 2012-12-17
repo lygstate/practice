@@ -258,12 +258,19 @@ namespace HttpDownloader
 
                     var f = new IO.FileStream(fullPath, IO.FileMode.OpenOrCreate, IO.FileAccess.Write, IO.FileShare.None);
                     // 开始读取数据
-                    byte[] sReaderBuffer = new byte[4096];
+                    byte[] sReaderBuffer = new byte[65536];
                     Console.WriteLine(response.ContentLength);
-                    int pos = 0;
+
+                    long pos = 0;
+                    long tot = response.ContentLength / 1024;
                     while (true)
                     {
-                        int count = sReader.Read(sReaderBuffer, 0, 4096);
+                        Dispatcher.Invoke(new Action(() =>
+                        {
+                            this.StatusLabel.Content = "Downloading: " + pos / 1024 + "/" + tot + " : "
+                                + uri;
+                        })); 
+                        int count = sReader.Read(sReaderBuffer, 0, 65536);
                         if (count <= 0)
                         {
                             break;
@@ -274,6 +281,11 @@ namespace HttpDownloader
                     // 读取结束
                     sReader.Close();
                     f.Close();
+                }
+                if (IO.File.Exists(fullPath))
+                {
+                    var info = new IO.FileInfo(fullPath);
+                    info.LastWriteTimeUtc = response.LastModified;
                 }
                 /*
                 var webClient = new WebClient();
