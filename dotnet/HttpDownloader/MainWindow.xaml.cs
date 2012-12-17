@@ -61,9 +61,7 @@ namespace HttpDownloader
                 Settings.Default.DownloadDirectory = this.LocalDirectoryTextBox.Text;
                 Settings.Default.Save();
             }
-            var urls = this.UrlsTextBox.Text.Split(new[] {
-				Environment.NewLine
-			}, StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
             lock (DownloadActionLock)
             {
                 if (IsDownloading)
@@ -72,6 +70,10 @@ namespace HttpDownloader
                 }
                 IsDownloading = true;
             }
+
+            var urls = this.UrlsTextBox.Text.Split(new[] {
+				Environment.NewLine
+			}, StringSplitOptions.RemoveEmptyEntries).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             this.SaveUrlsToLocal(urls, this.LocalDirectoryTextBox.Text);
         }
 
@@ -162,9 +164,15 @@ namespace HttpDownloader
         private Cursor SavedCursor;
         private void SaveUrlsToLocal(List<string> urls, string rootDirectory)
         {
+            if (urls.Count == 0)
+            {
+                return;
+            }
+
+            rootURL = urls[0];
+
             // disable the ui
             this.SavedCursor = this.Cursor;
-            //this.Cursor = Cursors.Wait;
             this.DownloadProgressBar.Maximum = urls.Count * 100;
             this.DownloadProgressBar.Value = 0;
             this.StartDownloadButton.Content = "下载中……";
@@ -328,7 +336,7 @@ namespace HttpDownloader
                     {
                         this.StatusLabel.Content = "Downloaded: " + uri;
                     }));
-                    Thread.Sleep(1000);
+                    //Thread.Sleep(1000);
                 }
                 request.Abort();
             }
