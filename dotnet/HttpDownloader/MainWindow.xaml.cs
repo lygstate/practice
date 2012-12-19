@@ -367,8 +367,7 @@ namespace HttpDownloader
                 {
                     var info = new IO.FileInfo(fullPath);
                     if (info.Length == response.ContentLength
-                        && IO.File.GetLastWriteTimeUtc(fullPath) == fileDate
-                        && !isHtml)
+                        && IO.File.GetLastWriteTimeUtc(fullPath) == fileDate)
                     {
                         needDown = false;
                     }
@@ -380,13 +379,11 @@ namespace HttpDownloader
                     info.Refresh();
                     request.Abort();
 
-                    if (contentLength <= 0 || (isHtml && info.Length < 1024 * 2))
+                    if (contentLength <= 0
+                        || (isHtml && info.Length < 1024 * 2)
+                        || info.Length >= response.ContentLength)
                     {
                         this.FullDownload(fullPath, uri, contentLength);
-                    }
-                    else if (info.Length < response.ContentLength && info.Length >= 8 * 1024 * 1024)
-                    {
-                        this.AppdendDownload(fullPath, uri, info.Length, contentLength);
                     }
                     else
                     {
@@ -440,8 +437,8 @@ namespace HttpDownloader
                     {
                         this.StatusLabel.Content = "Downloaded: " + uri;
                     }));
-                    //Thread.Sleep(1000);
                 }
+                Thread.Sleep(1000);
                 request.Abort();
             }
             catch (Exception e)
