@@ -215,7 +215,7 @@ namespace HttpDownloader
             // 获取响应流
             IO.Stream sReader = response.GetResponseStream();
 
-            long tot = contentLength / 1024;
+            long tot = contentLength;
             long pos = startPos;
             long lastPos = startPos;
             while (true)
@@ -224,9 +224,9 @@ namespace HttpDownloader
                 {
                     if (tot < pos)
                     {
-                        tot = ( pos / 1024 ) + 1;
+                        tot = pos + 2048;
                     }
-                    this.StatusLabel.Content = "Downloading: " + pos / 1024 + "/" + tot + " : "
+                    this.StatusLabel.Content = "Downloading: " + (pos / 1024) + "/" + (tot / 1024) + " : "
                         + response.ResponseUri;
                 }));
                 int count = sReader.Read(sReaderBuffer, 0, 65536);
@@ -253,7 +253,7 @@ namespace HttpDownloader
             {
                 var request = CreateRequest(uri);
                 var response = (HttpWebResponse)request.GetResponse();
-                Download(f, response, 0, response.ContentLength);
+                Download(f, response, 0, contentLength);
             }
             finally
             {
