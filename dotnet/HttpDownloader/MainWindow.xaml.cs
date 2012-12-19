@@ -373,13 +373,14 @@ namespace HttpDownloader
                     }
                 }
 
+                request.Abort();
                 if (needDown)
                 {
                     var info = new IO.FileInfo(fullPath);
                     info.Refresh();
-                    request.Abort();
 
-                    if (contentLength <= 0
+                    if (!info.Exists
+                        || contentLength <= 0
                         || (isHtml && info.Length < 1024 * 2)
                         || info.Length >= response.ContentLength)
                     {
@@ -439,7 +440,6 @@ namespace HttpDownloader
                     }));
                 }
                 Thread.Sleep(1000);
-                request.Abort();
             }
             catch (Exception e)
             {
