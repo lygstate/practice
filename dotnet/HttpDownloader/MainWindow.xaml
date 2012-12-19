@@ -16,13 +16,13 @@
         </DockPanel>
 
         <DockPanel DockPanel.Dock="Bottom" Margin="{StaticResource Margin4}">
-			<Button Content="开始下载" DockPanel.Dock="Right" Margin="{StaticResource LeftMargin2}" Name="StartDownloadButton" />
+            <Button Content="开始下载" DockPanel.Dock="Right" Margin="{StaticResource LeftMargin2}" Name="StartDownloadButton" Click="StartDownloadButtonOnClick" />
 			<ProgressBar Value="50" Minimum="0" Maximum="100" Margin="{StaticResource RightMargin2}" Name="DownloadProgressBar" />
 		</DockPanel>
 
 		<DockPanel DockPanel.Dock="Bottom" Margin="{StaticResource Margin4}">
 			<Label Content="本地目录：" DockPanel.Dock="Top"/>
-			<Button Content="浏览" DockPanel.Dock="Right" Margin="{StaticResource LeftMargin2}" Name="LocalDirectoryBrowsButton" />
+            <Button Content="浏览" DockPanel.Dock="Right" Margin="{StaticResource LeftMargin2}" Name="LocalDirectoryBrowsButton" Click="LocalDirectoryBrowsButtonOnClick" />
 			<TextBox Margin="{StaticResource RightMargin2}" Name="LocalDirectoryTextBox" />
         </DockPanel>
 

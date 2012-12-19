@@ -11,6 +11,7 @@ using html = HtmlAgilityPack;
 using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
+using FolderBrower = WPFFolderBrowser;
 
 
 namespace HttpDownloader
@@ -33,10 +34,8 @@ namespace HttpDownloader
         {
             InitializeComponent();
 
-            this.LocalDirectoryBrowsButton.Click += LocalDirectoryBrowsButtonOnClick;
-            this.StartDownloadButton.Click += StartDownloadButtonOnClick;
             this.LocalDirectoryTextBox.Text = Settings.Default.DownloadDirectory;
-            rootURL = "http://jaist.dl.sourceforge.net/project/mingw/";
+            rootURL = "http://lists.cs.uiuc.edu/pipermail/";
             this.rootURI = new Uri(rootURL);
             this.UrlsTextBox.Text = rootURL;
             this.DownloadProgressBar.Value = 0;
@@ -55,11 +54,6 @@ namespace HttpDownloader
                 MessageBox.Show("请选择保存目录！", "错误：", MessageBoxButton.OK, MessageBoxImage.Error);
                 this.LocalDirectoryTextBox.Focus();
                 return;
-            }
-            if (Settings.Default.DownloadDirectory != this.LocalDirectoryTextBox.Text)
-            {
-                Settings.Default.DownloadDirectory = this.LocalDirectoryTextBox.Text;
-                Settings.Default.Save();
             }
 
             lock (DownloadActionLock)
@@ -185,6 +179,59 @@ namespace HttpDownloader
             Task.Factory.StartNew(() => this.RecursiveUrls(urls, rootDirectory));
         }
 
+        private void AppdendDownload(String fullPath, long startPos, ref HttpWebRequest request, ref HttpWebResponse response)
+        {
+            var f = new IO.FileStream(fullPath, IO.FileMode.OpenOrCreate, IO.FileAccess.Write, IO.FileShare.None);
+            long contentLength = response.ContentLength;
+            request.Abort();
+            if (startPos > 0)
+            {
+                startPos -= startPos & 0xFF;
+            }
+            request.AddRange(startPos, contentLength);
+            response = (HttpWebResponse)request.GetResponse();
+            f.Seek(0, IO.SeekOrigin.End);
+            long pos = startPos;
+            long lastPos = startPos;
+        }
+
+        private void FullDownload(String fullPath, HttpWebResponse response)
+        {
+            var f = new IO.FileStream(fullPath, IO.FileMode.OpenOrCreate, IO.FileAccess.Write, IO.FileShare.None);
+            // 开始读取数据
+            byte[] sReaderBuffer = new byte[65536];
+
+            // 获取响应流
+            IO.Stream sReader = response.GetResponseStream();
+
+            long tot = response.ContentLength / 1024;
+            long pos = 0;
+            long lastPos = 0;
+            while (true)
+            {
+                Dispatcher.Invoke(new Action(() =>
+                {
+                    this.StatusLabel.Content = "Downloading: " + pos / 1024 + "/" + tot + " : "
+                        + response.ResponseUri;
+                }));
+                int count = sReader.Read(sReaderBuffer, 0, 65536);
+                if (count <= 0)
+                {
+                    break;
+                }
+                f.Write(sReaderBuffer, 0, count);
+                pos += count;
+                if (pos - lastPos > 1024 * 1024 * 4)
+                {
+                    f.Flush(true);
+                    lastPos = pos;
+                }
+            }
+            // 读取结束
+            sReader.Close();
+            f.Close();
+        }
+
         private void SaveUri(Uri uri, string rootDirectory)
         {
             Dispatcher.Invoke(new Action(() =>
@@ -198,6 +245,7 @@ namespace HttpDownloader
                 request.UserAgent = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0; BOIE9;ZHCN)";
                 request.Method = "GET";
                 request.Accept = "*/*";
+                request.Headers.Set("ContentDigest", "on");
                 //如果方法验证网页来源就加上这一句如果不验证那就可以不写了
 
                 /*
@@ -255,14 +303,20 @@ namespace HttpDownloader
                     IO.Directory.CreateDirectory(dir);
                 }
 
+                bool isHtml = response.ContentType.IndexOf("text/html") != -1;
+                if (uri.ToString().EndsWith("/") && !isHtml)
+                {
+                    throw new Exception("Invalid ContentType of:" + response);
+                }
+
                 bool needDown = true;
                 var otherDate = fileDate.ToUniversalTime();
                 if (IO.File.Exists(fullPath))
                 {
                     var info = new IO.FileInfo(fullPath);
-                    info.Refresh();
                     if (info.Length == response.ContentLength
-                        && IO.File.GetLastWriteTimeUtc(fullPath) == fileDate)
+                        && IO.File.GetLastWriteTimeUtc(fullPath) == fileDate
+                        && !isHtml)
                     {
                         needDown = false;
                     }
@@ -270,34 +324,20 @@ namespace HttpDownloader
 
                 if (needDown)
                 {
-                    // 获取响应流
-                    IO.Stream sReader = response.GetResponseStream();
-
-                    var f = new IO.FileStream(fullPath, IO.FileMode.OpenOrCreate, IO.FileAccess.Write, IO.FileShare.None);
-                    // 开始读取数据
-                    byte[] sReaderBuffer = new byte[65536];
-                    Console.WriteLine(response.ContentLength);
-
-                    long pos = 0;
-                    long tot = response.ContentLength / 1024;
-                    while (true)
+                    var info = new IO.FileInfo(fullPath);
+                    info.Refresh();
+                    if (response.ContentLength <= 0 || isHtml)
                     {
-                        Dispatcher.Invoke(new Action(() =>
-                        {
-                            this.StatusLabel.Content = "Downloading: " + pos / 1024 + "/" + tot + " : "
-                                + uri;
-                        })); 
-                        int count = sReader.Read(sReaderBuffer, 0, 65536);
-                        if (count <= 0)
-                        {
-                            break;
-                        }
-                        f.Write(sReaderBuffer, 0, count);
-                        pos += count;
+                        this.FullDownload(fullPath, response);
                     }
-                    // 读取结束
-                    sReader.Close();
-                    f.Close();
+                    else if (info.Length < response.ContentLength && info.Length >= 8 * 1024 * 1024)
+                    {
+                        this.AppdendDownload(fullPath, info.Length, ref request, ref response);
+                    }
+                    else
+                    {
+                        this.AppdendDownload(fullPath, info.Length, ref request, ref response);
+                    }
                 }
                 if (IO.File.Exists(fullPath))
                 {
@@ -305,17 +345,8 @@ namespace HttpDownloader
                     IO.File.SetCreationTimeUtc(fullPath, fileDate);
                     IO.File.SetLastAccessTimeUtc(fullPath, fileDate);
                 }
-                /*
-                var webClient = new WebClient();
-                webClient.DownloadFile(uri, fullPath);
-                webClient.Dispose();
-                    * */
-                bool isHtml = uri.ToString().EndsWith("/");
-                if (isHtml != (response.ContentType.IndexOf("text/html") != -1))
-                {
-                    throw new Exception("Invalid ContentType of:" + response);
-                }
-                if (response.ContentType.IndexOf("text/html") != -1)
+
+                if (isHtml)
                 {
                     var x = new html.HtmlDocument();
 
@@ -379,21 +410,21 @@ namespace HttpDownloader
 
         private void LocalDirectoryBrowsButtonOnClick(object sender, RoutedEventArgs routedEventArgs)
         {
-            var dialog = new WinForms.FolderBrowserDialog
+            var dialog = new FolderBrower.WPFFolderBrowserDialog
             {
-                Description = @"选择一个目录进行保存：",
-                ShowNewFolderButton = true
+                Title = @"选择一个目录进行保存：",
             };
             if (!string.IsNullOrWhiteSpace(this.LocalDirectoryTextBox.Text))
             {
-                dialog.SelectedPath = this.LocalDirectoryTextBox.Text;
+                dialog.InitialDirectory = this.LocalDirectoryTextBox.Text;
             }
             var dialogResult = dialog.ShowDialog();
-            if (dialogResult == WinForms.DialogResult.OK)
+            if (dialogResult == true && IO.Directory.Exists(dialog.FileName))
             {
-                this.LocalDirectoryTextBox.Text = dialog.SelectedPath;
+                this.LocalDirectoryTextBox.Text = dialog.FileName;
+                Settings.Default.DownloadDirectory = this.LocalDirectoryTextBox.Text;
+                Settings.Default.Save();
             }
-
         }
     }
 }
