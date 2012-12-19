@@ -179,38 +179,53 @@ namespace HttpDownloader
             Task.Factory.StartNew(() => this.RecursiveUrls(urls, rootDirectory));
         }
 
-        private void AppdendDownload(String fullPath, long startPos, ref HttpWebRequest request, ref HttpWebResponse response)
+        HttpWebRequest CreateRequest(Uri uri)
         {
-            var f = new IO.FileStream(fullPath, IO.FileMode.OpenOrCreate, IO.FileAccess.Write, IO.FileShare.None);
-            long contentLength = response.ContentLength;
-            request.Abort();
-            if (startPos > 0)
-            {
-                startPos -= startPos & 0xFF;
-            }
-            request.AddRange(startPos, contentLength);
-            response = (HttpWebResponse)request.GetResponse();
-            f.Seek(0, IO.SeekOrigin.End);
-            long pos = startPos;
-            long lastPos = startPos;
+            var request = (HttpWebRequest)WebRequest.Create(uri);
+            request.UserAgent = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0; BOIE9;ZHCN)";
+            request.Method = "GET";
+            request.Accept = "*/*";
+            //request.Headers.Set("ContentDigest", "on");
+
+            //如果方法验证网页来源就加上这一句如果不验证那就可以不写了
+            /*
+            request.Referer = "http://sufei.cnblogs.com";
+            CookieContainer objcok = new CookieContainer();
+            objcok.Add(new Uri("http://sufei.cnblogs.com"), new Cookie("键", "值"));
+            objcok.Add(new Uri("http://sufei.cnblogs.com"), new Cookie("键", "值"));
+            objcok.Add(new Uri("http://sufei.cnblogs.com"), new Cookie("sidi_sessionid", "360A748941D055BEE8C960168C3D4233"));
+            request.CookieContainer = objcok;
+            */
+
+            //不保持连接
+            request.KeepAlive = true;
+            return request;
         }
 
-        private void FullDownload(String fullPath, HttpWebResponse response)
+        private void Download(IO.FileStream f, HttpWebResponse response, long startPos, long contentLength)
         {
-            var f = new IO.FileStream(fullPath, IO.FileMode.OpenOrCreate, IO.FileAccess.Write, IO.FileShare.None);
             // 开始读取数据
             byte[] sReaderBuffer = new byte[65536];
+            long downloadLength = contentLength - startPos;
+            if (downloadLength <= 0 && contentLength > 0)
+            {
+                return;
+            }
 
             // 获取响应流
             IO.Stream sReader = response.GetResponseStream();
 
-            long tot = response.ContentLength / 1024;
-            long pos = 0;
-            long lastPos = 0;
+            long tot = contentLength / 1024;
+            long pos = startPos;
+            long lastPos = startPos;
             while (true)
             {
                 Dispatcher.Invoke(new Action(() =>
                 {
+                    if (tot < pos)
+                    {
+                        tot = ( pos / 1024 ) + 1;
+                    }
                     this.StatusLabel.Content = "Downloading: " + pos / 1024 + "/" + tot + " : "
                         + response.ResponseUri;
                 }));
@@ -229,9 +244,51 @@ namespace HttpDownloader
             }
             // 读取结束
             sReader.Close();
-            f.Close();
         }
 
+        private void FullDownload(String fullPath, Uri uri, long contentLength)
+        {
+            var f = new IO.FileStream(fullPath, IO.FileMode.OpenOrCreate, IO.FileAccess.Write, IO.FileShare.None);
+            try
+            {
+                var request = CreateRequest(uri);
+                var response = (HttpWebResponse)request.GetResponse();
+                Download(f, response, 0, response.ContentLength);
+            }
+            finally
+            {
+                f.Close();
+            }
+        }
+
+        private void AppdendDownload(String fullPath, Uri uri, long startPos, long contentLength)
+        {
+            var request = CreateRequest(uri);
+
+            if (startPos > 0)
+            {
+                startPos -= startPos & 0xFF;
+            }
+            request.AddRange(startPos, contentLength - 1);
+            var response = (HttpWebResponse)request.GetResponse();
+            if (response.StatusCode == HttpStatusCode.OK)
+            {
+                request.Abort();
+                Console.WriteLine("文件不支持Range部分下载");
+                FullDownload(fullPath, uri, contentLength);
+            }
+
+            var f = new IO.FileStream(fullPath, IO.FileMode.OpenOrCreate, IO.FileAccess.Write, IO.FileShare.None);
+            f.Seek(startPos, IO.SeekOrigin.Begin);
+            try
+            {
+                Download(f, response, startPos, contentLength);
+            }
+            finally
+            {
+                f.Close();
+            }
+        }
         private void SaveUri(Uri uri, string rootDirectory)
         {
             Dispatcher.Invoke(new Action(() =>
@@ -241,27 +298,22 @@ namespace HttpDownloader
             try
             {
                 // 与指定URL创建HTTP请求
-                HttpWebRequest request = (HttpWebRequest)WebRequest.Create(uri);
-                request.UserAgent = "Mozilla/5.0 (compatible; MSIE 9.0; Windows NT 6.1; Trident/5.0; BOIE9;ZHCN)";
-                request.Method = "GET";
-                request.Accept = "*/*";
-                request.Headers.Set("ContentDigest", "on");
-                //如果方法验证网页来源就加上这一句如果不验证那就可以不写了
+                var request = CreateRequest(uri);
 
-                /*
-                request.Referer = "http://sufei.cnblogs.com";
-                CookieContainer objcok = new CookieContainer();
-                objcok.Add(new Uri("http://sufei.cnblogs.com"), new Cookie("键", "值"));
-                objcok.Add(new Uri("http://sufei.cnblogs.com"), new Cookie("键", "值"));
-                objcok.Add(new Uri("http://sufei.cnblogs.com"), new Cookie("sidi_sessionid", "360A748941D055BEE8C960168C3D4233"));
-                request.CookieContainer = objcok;
-                */
-
-                //不保持连接
-                request.KeepAlive = true;
-                
+                HttpWebResponse response = null;
                 // 获取对应HTTP请求的响应
-                HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+                try
+                {
+                    response = (HttpWebResponse)request.GetResponse();
+                }
+                catch (Exception)
+                {
+                    response = null;
+                }
+                if (response == null)
+                {
+                    return;
+                }
                 DateTime fileDate = DateTime.UtcNow;
                 try
                 {
@@ -290,8 +342,8 @@ namespace HttpDownloader
                 {
                     filePath = IO.Path.Combine(filePath.TrimEnd("/".ToCharArray()), "index.html");
                 }
-
-                if (response.ContentLength == 0)
+                long contentLength = response.ContentLength;
+                if (contentLength == 0)
                 {
                     return;
                 }
@@ -326,17 +378,19 @@ namespace HttpDownloader
                 {
                     var info = new IO.FileInfo(fullPath);
                     info.Refresh();
-                    if (response.ContentLength <= 0 || (isHtml && response.ContentLength < 1024 * 1024))
+                    request.Abort();
+
+                    if (contentLength <= 0 || (isHtml && info.Length < 1024 * 2))
                     {
-                        this.FullDownload(fullPath, response);
+                        this.FullDownload(fullPath, uri, contentLength);
                     }
                     else if (info.Length < response.ContentLength && info.Length >= 8 * 1024 * 1024)
                     {
-                        this.AppdendDownload(fullPath, info.Length, ref request, ref response);
+                        this.AppdendDownload(fullPath, uri, info.Length, contentLength);
                     }
                     else
                     {
-                        this.AppdendDownload(fullPath, info.Length, ref request, ref response);
+                        this.AppdendDownload(fullPath, uri, info.Length, contentLength);
                     }
                 }
                 if (IO.File.Exists(fullPath))
@@ -346,7 +400,7 @@ namespace HttpDownloader
                     IO.File.SetLastAccessTimeUtc(fullPath, fileDate);
                 }
 
-                if (isHtml)
+                if (isHtml && uri.ToString().EndsWith("/"))
                 {
                     var x = new html.HtmlDocument();
 
