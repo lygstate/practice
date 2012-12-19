@@ -326,7 +326,7 @@ namespace HttpDownloader
                 {
                     var info = new IO.FileInfo(fullPath);
                     info.Refresh();
-                    if (response.ContentLength <= 0 || isHtml)
+                    if (response.ContentLength <= 0 || (isHtml && response.ContentLength < 1024 * 1024))
                     {
                         this.FullDownload(fullPath, response);
                     }
