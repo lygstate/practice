@@ -98,7 +98,7 @@ namespace HttpDownloader
                         continue;
                     }
 
-                    if (tasks.Count == 0 && URLs.Count == 0)
+                    if (tasks.Count == 0 && i >= URLs.Count)
                     {
                         break;
                     }
@@ -110,6 +110,7 @@ namespace HttpDownloader
                         if (i < URLs.Count)
                         {
                             url = URLs[i];
+                            ++i;
                         }
                         count = URLs.Count;
                     }
@@ -135,7 +136,6 @@ namespace HttpDownloader
                             );
                     }
 
-                    ++i;
                     Dispatcher.Invoke(new Action(() =>
                     {
                         int currentCount = count;
@@ -148,6 +148,7 @@ namespace HttpDownloader
                         {
                             this.DownloadProgressBar.Value = (i * this.DownloadProgressBar.Maximum / count);
                         }
+                        this.RunningThreads.Content  = String.Format("Threads: {0}/{1}", tasks.Count, URLs.Count);
                     }));
                 }
             }

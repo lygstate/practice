@@ -12,13 +12,14 @@
 	
 	<DockPanel LastChildFill="True">
         <DockPanel DockPanel.Dock="Bottom" Margin="{StaticResource Margin4}">
+            <Label Name="RunningThreads" Width="150" Content="Threads:0/0" HorizontalAlignment="Left"/>
             <Label Name="StatusLabel" Content="Downloading..." HorizontalAlignment="Left"/>
         </DockPanel>
 
         <DockPanel DockPanel.Dock="Bottom" Margin="{StaticResource Margin4}">
             <Button Content="开始下载" DockPanel.Dock="Right" Margin="{StaticResource LeftMargin2}" Name="StartDownloadButton" Click="StartDownloadButtonOnClick" />
-			<ProgressBar Value="50" Minimum="0" Maximum="100" Margin="{StaticResource RightMargin2}" Name="DownloadProgressBar" />
-		</DockPanel>
+            <ProgressBar Value="50" Minimum="0" Maximum="100" Margin="{StaticResource RightMargin2}" Name="DownloadProgressBar" />
+        </DockPanel>
 
 		<DockPanel DockPanel.Dock="Bottom" Margin="{StaticResource Margin4}">
 			<Label Content="本地目录：" DockPanel.Dock="Top"/>
