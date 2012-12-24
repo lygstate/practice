@@ -12,7 +12,7 @@
 	
 	<DockPanel LastChildFill="True">
         <DockPanel DockPanel.Dock="Bottom" Margin="{StaticResource Margin4}">
-            <Label Name="RunningThreads" Width="150" Content="Threads:0/0" HorizontalAlignment="Left"/>
+            <Label Name="RunningThreads" Width="200" Content="Running:0; Progress:0/0" HorizontalAlignment="Left"/>
             <Label Name="StatusLabel" Content="Downloading..." HorizontalAlignment="Left"/>
         </DockPanel>
 

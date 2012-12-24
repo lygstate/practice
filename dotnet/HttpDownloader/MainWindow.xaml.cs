@@ -91,7 +91,7 @@ namespace HttpDownloader
             {
                 while (true)
                 {
-                    if ((tasks.Count > 0 && URLs.Count == 0) || tasks.Count >= 4)
+                    if ((tasks.Count > 0 && URLs.Count == 0) || tasks.Count >= 8)
                     {
                         var index = Task.WaitAny(tasks.ToArray<Task>());
                         tasks.RemoveAt(index);
@@ -148,7 +148,7 @@ namespace HttpDownloader
                         {
                             this.DownloadProgressBar.Value = (i * this.DownloadProgressBar.Maximum / count);
                         }
-                        this.RunningThreads.Content  = String.Format("Threads: {0}/{1}", tasks.Count, URLs.Count);
+                        this.RunningThreads.Content = String.Format("Running:{0}; Progress:{1}/{2}", tasks.Count, i, URLs.Count);
                     }));
                 }
             }
