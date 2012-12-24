@@ -400,6 +400,7 @@ namespace HttpDownloader
 
                 if (isHtml && uri.ToString().EndsWith("/"))
                 {
+                    var marks = new bool[4];
                     var x = new html.HtmlDocument();
 
                     x.Load(fullPath, Encoding.GetEncoding(response.CharacterSet));
@@ -418,18 +419,40 @@ namespace HttpDownloader
                                 if (testAttr[0] != '/'
                                     && testAttr.IndexOfAny("*:<>?|".ToCharArray()) == -1)
                                 {
-                                    //System.Console.WriteLine(attrib);
                                     var newUrl = new Uri(uri, attrib).ToString();
                                     this.addUri(newUrl);
                                     Dispatcher.Invoke(new Action(() =>
                                     {
                                         this.StatusLabel.Content = "New URL: " + newUrl;
                                     }));
-                                    //Thread.Sleep(500);
+                                    string[] strs = attrib.Split("/".ToCharArray());
+                                    var name = strs.Last();
+                                    switch (name)
+                                    {
+                                        case "author.html":
+                                            marks[0] = true;
+                                            break;
+                                        case "date.html":
+                                            marks[1] = true;
+                                            break;
+                                        case "subject.html":
+                                            marks[2] = true;
+                                            break;
+                                        case "thread.html":
+                                            marks[3] = true;
+                                            break;
+                                        default:
+                                            break;
+                                    }
                                 }
                             }
                             nodes.Enqueue(child);
                         }
+                    }
+                    if (Enumerable.SequenceEqual(marks, Enumerable.Repeat(true, marks.Length).ToArray()))
+                    {
+                        var newUrl = new Uri(uri, "attachments/").ToString();
+                        this.addUri(newUrl);
                     }
                 }
                 else
@@ -439,7 +462,7 @@ namespace HttpDownloader
                         this.StatusLabel.Content = "Downloaded: " + uri;
                     }));
                 }
-                Thread.Sleep(1000);
+                //Thread.Sleep(1000);
             }
             catch (Exception e)
             {
