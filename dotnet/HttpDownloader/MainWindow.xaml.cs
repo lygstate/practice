@@ -85,11 +85,24 @@ namespace HttpDownloader
         private void RecursiveUrls(List<string> inputUrls, string rootDirectory)
         {
             URLs = inputUrls;
-            int i = 0;            
+            int i = 0;
+            var tasks = new List<Task>();
             try
             {
                 while (true)
                 {
+                    if ((tasks.Count > 0 && URLs.Count == 0) || tasks.Count >= 4)
+                    {
+                        var index = Task.WaitAny(tasks.ToArray<Task>());
+                        tasks.RemoveAt(index);
+                        continue;
+                    }
+
+                    if (tasks.Count == 0 && URLs.Count == 0)
+                    {
+                        break;
+                    }
+
                     string url = null;
                     int count = 0;
                     lock (URLsLock)
@@ -103,8 +116,9 @@ namespace HttpDownloader
 
                     if (url == null)
                     {
-                        break;
+                        continue;
                     }
+
                     Uri uri = null;
                     try
                     {
@@ -116,7 +130,9 @@ namespace HttpDownloader
                     }
                     if (uri != null)
                     {
-                        this.SaveUri(uri, rootDirectory);
+                        tasks.Add(
+                            Task.Factory.StartNew(() => this.SaveUri(uri, rootDirectory))
+                            );
                     }
 
                     ++i;
