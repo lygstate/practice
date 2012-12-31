@@ -91,7 +91,7 @@ namespace HttpDownloader
             {
                 while (true)
                 {
-                    if ((tasks.Count > 0 && URLs.Count == 0) || tasks.Count >= 8)
+                    if ((tasks.Count > 0 && URLs.Count == 0) || tasks.Count >= 4)
                     {
                         var index = Task.WaitAny(tasks.ToArray<Task>());
                         tasks.RemoveAt(index);
