@@ -29,13 +29,17 @@ namespace HttpDownloader
         private static Object DownloadActionLock = new Object();
         private static Object URLsLock = new Object();
         private static volatile bool IsDownloading = false;
+        private const long ParallelCount = 4;
 
         public MainWindow()
         {
             InitializeComponent();
 
             this.LocalDirectoryTextBox.Text = Settings.Default.DownloadDirectory;
+            rootURL = "http://nchc.dl.sourceforge.net/project/mingw/";
             rootURL = "http://lists.cs.uiuc.edu/pipermail/";
+            rootURL = "http://nchc.dl.sourceforge.net/project/mingwbuilds/host-windows/releases/";
+            rootURL = "http://jaist.dl.sourceforge.net/project/mingwbuilds/host-windows/releases/";
             this.rootURI = new Uri(rootURL);
             this.UrlsTextBox.Text = rootURL;
             this.DownloadProgressBar.Value = 0;
@@ -91,7 +95,7 @@ namespace HttpDownloader
             {
                 while (true)
                 {
-                    if ((tasks.Count > 0 && URLs.Count == 0) || tasks.Count >= 4)
+                    if ((tasks.Count > 0 && URLs.Count == 0) || tasks.Count >= ParallelCount)
                     {
                         var index = Task.WaitAny(tasks.ToArray<Task>());
                         tasks.RemoveAt(index);
