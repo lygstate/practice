@@ -95,7 +95,7 @@ namespace HttpDownloader
             {
                 while (true)
                 {
-                    if ((tasks.Count > 0 && URLs.Count == 0) || tasks.Count >= ParallelCount)
+                    if ((tasks.Count > 0 && i >= URLs.Count) || tasks.Count >= ParallelCount)
                     {
                         var index = Task.WaitAny(tasks.ToArray<Task>());
                         tasks.RemoveAt(index);
@@ -310,6 +310,12 @@ namespace HttpDownloader
                 f.Close();
             }
         }
+
+        static string GetParentUriString(Uri uri)
+        {
+            return uri.AbsoluteUri.Remove(uri.AbsoluteUri.Length - uri.Segments.Last().Length);
+        }
+
         private void SaveUri(Uri uri, string rootDirectory)
         {
             Dispatcher.Invoke(new Action(() =>
@@ -419,7 +425,7 @@ namespace HttpDownloader
                     IO.File.SetLastAccessTimeUtc(fullPath, fileDate);
                 }
 
-                if (isHtml && uri.ToString().EndsWith("/"))
+                if (isHtml)
                 {
                     var marks = new bool[4];
                     var x = new html.HtmlDocument();
@@ -431,42 +437,52 @@ namespace HttpDownloader
                     while (nodes.Count != 0)
                     {
                         var node = (html.HtmlNode)nodes.Dequeue();
-                        foreach (html.HtmlNode child in node.ChildNodes)
+                        Console.WriteLine(node.Name + ":" + node.InnerText);
+                        if (node.Name.ToLower() == "img")
                         {
-                            string attrib = child.GetAttributeValue("href", String.Empty);
-                            string testAttr = Uri.UnescapeDataString(attrib);
-                            if (attrib != String.Empty)
+                            String imgUrl = node.GetAttributeValue("src", String.Empty);
+                            if (imgUrl != String.Empty) { 
+                                var newUrl = new Uri(uri, imgUrl).ToString();
+                                this.addUri(newUrl);
+                            }
+                        }
+                        string attrib = node.GetAttributeValue("href", String.Empty);
+                        string testAttr = Uri.UnescapeDataString(attrib);
+                        if (attrib != String.Empty)
+                        {
+                            if (testAttr[0] != '/'
+                                && testAttr.IndexOfAny("*:<>?|".ToCharArray()) == -1)
                             {
-                                if (testAttr[0] != '/'
-                                    && testAttr.IndexOfAny("*:<>?|".ToCharArray()) == -1)
+                                var newUrl = new Uri(uri, attrib).ToString();
+                                this.addUri(newUrl);
+                                Dispatcher.Invoke(new Action(() =>
                                 {
-                                    var newUrl = new Uri(uri, attrib).ToString();
-                                    this.addUri(newUrl);
-                                    Dispatcher.Invoke(new Action(() =>
-                                    {
-                                        this.StatusLabel.Content = "New URL: " + newUrl;
-                                    }));
-                                    string[] strs = attrib.Split("/".ToCharArray());
-                                    var name = strs.Last();
-                                    switch (name)
-                                    {
-                                        case "author.html":
-                                            marks[0] = true;
-                                            break;
-                                        case "date.html":
-                                            marks[1] = true;
-                                            break;
-                                        case "subject.html":
-                                            marks[2] = true;
-                                            break;
-                                        case "thread.html":
-                                            marks[3] = true;
-                                            break;
-                                        default:
-                                            break;
-                                    }
+                                    this.StatusLabel.Content = "New URL: " + newUrl;
+                                }));
+                                string[] strs = attrib.Split("/".ToCharArray());
+                                var name = strs.Last();
+                                switch (name)
+                                {
+                                    case "author.html":
+                                        marks[0] = true;
+                                        break;
+                                    case "date.html":
+                                        marks[1] = true;
+                                        break;
+                                    case "subject.html":
+                                        marks[2] = true;
+                                        break;
+                                    case "thread.html":
+                                        marks[3] = true;
+                                        break;
+                                    default:
+                                        break;
                                 }
                             }
+                        } 
+
+                        foreach (html.HtmlNode child in node.ChildNodes)
+                        {
                             nodes.Enqueue(child);
                         }
                     }
